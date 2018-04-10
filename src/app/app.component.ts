@@ -1,7 +1,10 @@
+import { StatePersistingService } from './state-persisting.service';
 import { Component } from '@angular/core';
 import { process, State } from '@progress/kendo-data-query';
 import { sampleProducts } from './products';
 import { GridDataResult, DataStateChangeEvent } from '@progress/kendo-angular-grid';
+import { GridSettings } from './grid-settings.interface';
+import { ColumnSettings } from './column-settings.interface';
 
 @Component({
   selector: 'app-root',
@@ -9,11 +12,11 @@ import { GridDataResult, DataStateChangeEvent } from '@progress/kendo-angular-gr
     <h4>Dynamic column generation, state and columns config saved and loaded manually</h4>
     <kendo-grid
       #grid
-      [data]="gridData"
-      [pageSize]="state.take"
-      [skip]="state.skip"
-      [sort]="state.sort"
-      [filter]="state.filter"
+      [data]="gridData1"
+      [pageSize]="state1.take"
+      [skip]="state1.skip"
+      [sort]="state1.sort"
+      [filter]="state1.filter"
       [sortable]="true"
       [pageable]="true"
       [filterable]="true"
@@ -22,10 +25,10 @@ import { GridDataResult, DataStateChangeEvent } from '@progress/kendo-angular-gr
       (dataStateChange)="dataStateChange($event)"
     >
       <ng-template kendoGridToolbarTemplate>
-        <button class="k-button" (click)="saveGridState(grid)">Save current state</button>
-        <button class="k-button" *ngIf="savedStateExists" (click)="loadGridState()">Load saved state</button>
+        <button class="k-button" (click)="saveGridSettings(grid)">Save current state</button>
+        <button class="k-button" *ngIf="savedStateExists" (click)="loadGridSettings(1, persistingService.loadGridSettings('gridSettings'))">Load saved state</button>
       </ng-template>
-      <kendo-grid-column *ngFor="let col of columnsConfig"
+      <kendo-grid-column *ngFor="let col of columnsConfig1"
         [field]="col.field" 
         [title]="col.title" 
         [width]="col._width" 
@@ -36,7 +39,7 @@ import { GridDataResult, DataStateChangeEvent } from '@progress/kendo-angular-gr
     </kendo-grid>
     <h4>Latest state and columns config saved automatically in event handlers</h4>
     <kendo-grid
-      [data]="grid2Data"
+      [data]="gridData2"
       [pageSize]="state2.take"
       [skip]="state2.skip"
       [sort]="state2.sort"
@@ -63,7 +66,7 @@ import { GridDataResult, DataStateChangeEvent } from '@progress/kendo-angular-gr
   styles: []
 })
 export class AppComponent {
-  public state: State = {
+  public state1: State = {
     skip: 0,
     take: 5,
 
@@ -85,12 +88,12 @@ export class AppComponent {
     }
   };
 
-  public gridData: GridDataResult = process(sampleProducts, this.state);
-  public grid2Data: GridDataResult = process(sampleProducts, this.state2);
+  public gridData1: GridDataResult = process(sampleProducts, this.state1);
+  public gridData2: GridDataResult = process(sampleProducts, this.state2);
 
-  public savedStateExists = !!localStorage.getItem('gridSettings');
+  public savedStateExists = this.persistingService.savedStateExists;
 
-  public columnsConfig = [{
+  public columnsConfig1: ColumnSettings[] = [{
     field: 'ProductID',
     title: 'ID',
     filterable: false,
@@ -98,7 +101,8 @@ export class AppComponent {
   }, {
     field: 'ProductName',
     title: 'Product Name',
-    filterable: true
+    filterable: true,
+    _width: 300
   }, {
     field: 'FirstOrderedOn',
     title: 'First Ordered On',
@@ -120,7 +124,7 @@ export class AppComponent {
     filterable: true
   }];
 
-  public columnsConfig2 = [{
+  public columnsConfig2: ColumnSettings[] = [{
     field: 'ProductID',
     title: 'ID',
     filterable: false,
@@ -129,7 +133,7 @@ export class AppComponent {
     field: 'ProductName',
     title: 'Product Name',
     filterable: true,
-    width: undefined
+    width: 300
   }, {
     field: 'FirstOrderedOn',
     title: 'First Ordered On',
@@ -151,19 +155,19 @@ export class AppComponent {
     filterable: true
   }];
 
-  constructor() {
-    this.loadGridState();
-    this.loadGrid2State();
+  constructor(public persistingService: StatePersistingService) {
+    this.loadGridSettings(1, this.persistingService.loadGridSettings('gridSettings'));
+    this.loadGridSettings(2, this.persistingService.loadGridSettings('grid2Settings'));
   }  
   
   public dataStateChange(state: DataStateChangeEvent): void {
-      this.state = state;
-      this.gridData = process(sampleProducts, this.state);
+      this.state1 = state;
+      this.gridData1 = process(sampleProducts, this.state1);
   }
 
   public dataStateChange2(state: DataStateChangeEvent): void {
     this.state2 = state;
-    this.grid2Data = process(sampleProducts, this.state2);
+    this.gridData2 = process(sampleProducts, this.state2);
     this.saveGrid2();
 }
 
@@ -176,41 +180,31 @@ export class AppComponent {
   public onResize(e) {
     e.forEach(item => {
       this.columnsConfig2.find(col => col.field === item.column.field).width = item.newWidth;
-      this.saveGrid2();
     });
+
+    this.saveGrid2();
   }
 
-  public saveGridState(grid) {
+  public saveGridSettings(grid) {
     const columns = grid.columns;
 
     const gridConfig = {
-      state: this.state,
+      state: this.state1,
       columns: columns.toArray().map(item => {
-        return Object.keys(item).filter(propName => !propName.toLowerCase().includes('template')).reduce((acc, curr) => {
-          acc[curr] = item[curr]
-          return acc;
-        }, {});
+        return Object.keys(item).filter(propName => !propName.toLowerCase().includes('template')).reduce((acc, curr) => ({...acc, ...{[curr]: item[curr]}}), {});
       })
     }
 
-    localStorage.setItem('gridSettings', JSON.stringify(gridConfig));
+    console.log(gridConfig.columns)
+    
+    this.persistingService.saveGridSettings('gridSettings', gridConfig);
   }
 
-  public loadGridState() {
-    const savedState = JSON.parse(localStorage.getItem('gridSettings'));
-    if(savedState) {
-      this.state = savedState.state;
-      this.columnsConfig = savedState.columns.sort((a, b) => a.orderIndex - b.orderIndex);
-      this.gridData = process(sampleProducts, this.state);
-    }
-  }
-
-  public loadGrid2State() {
-    const savedState = JSON.parse(localStorage.getItem('grid2Settings'));
-    if(savedState) {
-      this.state2 = savedState.state;
-      this.columnsConfig2 = savedState.columns.sort((a, b) => a.orderIndex - b.orderIndex);
-      this.grid2Data = process(sampleProducts, this.state2);
+  public loadGridSettings(token, gridSettings: GridSettings) {
+    if(gridSettings) {
+      this[`state${token}`] = gridSettings.state;
+      this[`columnsConfig${token}`] = gridSettings.columns.sort((a, b) => a.orderIndex - b.orderIndex);
+      this[`gridData${token}`] = process(sampleProducts, this[`state${token}`]);
     }
   }
 
@@ -220,6 +214,6 @@ export class AppComponent {
       state: this.state2
     };
 
-    localStorage.setItem('grid2Settings', JSON.stringify(grid2Config));
+    this.persistingService.saveGridSettings('grid2Settings', grid2Config);
   }
 }

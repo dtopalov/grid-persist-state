@@ -5,7 +5,7 @@ import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { GridModule } from '@progress/kendo-angular-grid';
 
 import { AppComponent } from './app.component';
-
+import { StatePersistingService } from './state-persisting.service';
 
 @NgModule({
   declarations: [
@@ -16,7 +16,7 @@ import { AppComponent } from './app.component';
     BrowserAnimationsModule,
     GridModule
   ],
-  providers: [],
+  providers: [StatePersistingService],
   bootstrap: [AppComponent]
 })
 export class AppModule { }
