@@ -4,17 +4,12 @@ import { State } from '@progress/kendo-data-query';
 
 @Injectable()
 export class StatePersistingService {
-    public get savedStateExists(): boolean {
-        return !!this.loadGridSettings('gridSettings');
+    public get<T>(token: string): T {
+        const settings = localStorage.getItem(token);
+        return settings ? JSON.parse(settings) : settings;
     }
 
-    public loadGridSettings(token: string): GridSettings|null {
-        console.log(token)
-        console.log(JSON.parse(localStorage.getItem(token)));
-        return JSON.parse(localStorage.getItem(token));
-    }
-
-    public saveGridSettings(token: string, gridConfig: GridSettings): void {
+    public set<T>(token: string, gridConfig: GridSettings): void {
         localStorage.setItem(token, JSON.stringify(gridConfig));
     }
 }
